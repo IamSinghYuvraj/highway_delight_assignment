@@ -1,12 +1,13 @@
 // app/(auth)/login/page.tsx
 import Link from "next/link"
-import { LoginForm } from "@/components/auth/login-form"
 import { redirect } from "next/navigation"
-import { getUserFromRequest } from "@/lib/auth"
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/app/api/auth/[...nextauth]/route"
+import AuthForm from "@/components/AuthForm"
 
 export default async function LoginPage() {
-  const user = await getUserFromRequest()
-  if (user) redirect("/dashboard")
+  const session = await getServerSession(authOptions)
+  if (session?.user) redirect("/dashboard")
   return (
     <main className="min-h-dvh flex items-center justify-center bg-white px-4">
       <div className="w-full max-w-md">
@@ -14,7 +15,7 @@ export default async function LoginPage() {
           <h1 className="text-2xl font-semibold text-gray-900 text-balance">Welcome back</h1>
           <p className="text-sm text-gray-600">Log in to continue taking notes</p>
         </div>
-        <LoginForm />
+        <AuthForm mode="login" />
         <p className="mt-6 text-center text-sm text-gray-600">
           Don{"'"}t have an account?{" "}
           <Link href="/signup" className="text-blue-600 hover:underline">

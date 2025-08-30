@@ -24,14 +24,6 @@ if (!cached) {
 }
 
 export async function connectToDatabase() {
-	// Clear any existing connection to force fresh connection
-	if (cached!.conn) {
-		console.log('🔄 Clearing cached connection to ensure fresh database connection')
-		await mongoose.disconnect()
-		cached!.conn = null
-		cached!.promise = null
-	}
-
 	if (!cached!.promise) {
 		// Ensure we're connecting to a specific database
 		const uri = `${MONGODB_URI.replace(/\/$/, "")}/${MONGODB_DB}`
