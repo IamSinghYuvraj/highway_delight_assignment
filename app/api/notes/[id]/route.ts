@@ -1,24 +1,34 @@
-// app/api/notes/[id]/route.ts
-import { NextResponse } from "next/server"
-import { connectToDatabase } from "@/lib/db"
-import { Note } from "@/models/note"
-import { getUserFromRequest } from "@/lib/auth"
+import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
+import { connectToDatabase } from "@/lib/db";
+import Note from "@/models/Note";
 
-type Params = { params: { id: string } }
-
-export async function DELETE(_req: Request, { params }: Params) {
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    const user = await getUserFromRequest()
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-    await connectToDatabase()
+    const { id } = await params;
+    await connectToDatabase();
+    
+    // Find the note and ensure it belongs to the user
+    const note = await Note.findOne({ _id: id, userId: session.user.id });
+    
+    if (!note) {
+      return NextResponse.json({ error: "Note not found" }, { status: 404 });
+    }
 
-    const note = await Note.findOne({ _id: params.id, userId: user.sub })
-    if (!note) return NextResponse.json({ error: "Not found" }, { status: 404 })
+    await Note.deleteOne({ _id: id });
 
-    await Note.deleteOne({ _id: note._id })
-    return NextResponse.json({ success: true })
-  } catch {
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
+    return NextResponse.json({ message: "Note deleted successfully" });
+  } catch (error) {
+    console.error("Failed to delete note:", error);
+    return NextResponse.json({ error: "Failed to delete note" }, { status: 500 });
   }
 }

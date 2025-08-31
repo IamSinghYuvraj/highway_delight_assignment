@@ -1,22 +1,30 @@
-// models/note.ts
-import mongoose, { Schema, type Model, type Types } from "mongoose"
+// models/Note.ts
+import mongoose, { Schema, model, models } from "mongoose"
 
 export type INote = {
-  _id: string
+  _id?: string
   title: string
   content: string
-  userId: Types.ObjectId
-  createdAt: Date
-  updatedAt: Date
+  userId: string
+  createdAt?: Date
+  updatedAt?: Date
 }
 
-const NoteSchema = new Schema<INote>(
+const noteSchema = new Schema<INote>(
   {
     title: { type: String, required: true },
     content: { type: String, required: true },
-    userId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    userId: { type: String, required: true },
   },
   { timestamps: true }
 )
 
-export const Note: Model<INote> = mongoose.models.Note || mongoose.model<INote>("Note", NoteSchema)
+// In dev with hot-reload, a previously-compiled model may persist with an old schema.
+// Clear it so the latest schema is used.
+if (mongoose.models?.Note) {
+  delete mongoose.models.Note
+}
+
+const Note = models?.Note || model<INote>("Note", noteSchema);
+
+export default Note;

@@ -2,12 +2,12 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
 import { getServerSession } from "next-auth"
-import { authOptions } from "@/app/api/auth/[...nextauth]/route"
+import { authOptions } from "@/lib/auth"
 import AuthForm from "@/components/AuthForm"
 
 export default async function SignupPage() {
   const session = await getServerSession(authOptions)
-  if (session?.user) redirect("/dashboard")
+  if (session?.user) redirect("/home")
   return (
     <main className="min-h-dvh flex items-center justify-center bg-white px-4">
       <div className="w-full max-w-md">

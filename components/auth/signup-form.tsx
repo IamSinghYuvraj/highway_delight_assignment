@@ -3,7 +3,6 @@
 
 import type React from "react"
 import { useState } from "react"
-import { signupSchema } from "@/lib/validators"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,6 +12,7 @@ import GoogleButton from "./google-button"
 
 export function SignupForm() {
   const router = useRouter()
+  const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -22,10 +22,13 @@ export function SignupForm() {
     e.preventDefault()
     setError(null)
 
-    const parsed = signupSchema.safeParse({ email, password })
-    if (!parsed.success) {
-      const issues = parsed.error.issues.map((i) => i.message).join(". ")
-      setError(issues)
+    if (!email || !password) {
+      setError("Email and password are required")
+      return
+    }
+
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters long")
       return
     }
 
@@ -35,7 +38,7 @@ export function SignupForm() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, name: name || undefined }),
       })
       
       const data = await res.json()
@@ -48,7 +51,8 @@ export function SignupForm() {
       router.push("/login?message=" + encodeURIComponent(data.message || "Account created successfully. Please log in."))
       
     } catch (err: any) {
-      setError(err.message || "Signup failed")
+      const errorData = await err.json?.() || {};
+      setError(errorData.error || err.message || "Signup failed")
     } finally {
       setLoading(false)
     }
@@ -58,11 +62,32 @@ export function SignupForm() {
     <Card>
       <CardContent className="pt-6">
         {error && (
-          <div key={error} className="mb-3 text-sm text-red-600">
-            {error}
+          <div className="mb-3">
+            <p className="text-sm text-red-600">{error}</p>
+            {error.includes('already exists') && (
+              <div className="mt-2">
+                <Button 
+                  variant="link" 
+                  className="h-auto p-0 text-sm"
+                  onClick={() => router.push('/login')}
+                >
+                  Go to Login
+                </Button>
+              </div>
+            )}
           </div>
         )}
         <form className="grid gap-4" onSubmit={onSubmit} noValidate>
+          <div className="grid gap-2">
+            <Label htmlFor="name">Name (Optional)</Label>
+            <Input
+              id="name"
+              type="text"
+              placeholder="Your name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
           <div className="grid gap-2">
             <Label htmlFor="email">Email</Label>
             <Input
@@ -103,3 +128,4 @@ export function SignupForm() {
     </Card>
   )
 }
+

@@ -1,9 +1,9 @@
 // components/auth/login-form.tsx
 "use client"
 
-import type React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, type FormEvent } from "react"
 import { loginSchema } from "@/lib/validators"
+import { signIn, useSession } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -14,6 +14,7 @@ import GoogleButton from "./google-button"
 export function LoginForm() {
   const router = useRouter()
   const params = useSearchParams()
+  const { data: session } = useSession()
   
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -22,9 +23,15 @@ export function LoginForm() {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
+    if (session) {
+      router.push("/home")
+    }
+  }, [session, router])
+
+  useEffect(() => {
     if (typeof window !== 'undefined') {
-      if (params.get("error") === "google_oauth_failed") {
-        setError("Google sign-in failed")
+      if (params.get("error")) {
+        setError(params.get("error") || "Authentication failed")
       }
       if (params.get("logout") === "success") {
         setError(null)
@@ -37,35 +44,30 @@ export function LoginForm() {
     }
   }, [params])
 
-  async function onSubmit(e: React.FormEvent) {
+  async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setError(null)
     setSuccess(null)
 
     const parsed = loginSchema.safeParse({ email, password })
     if (!parsed.success) {
-      const issues = parsed.error.issues.map((i) => i.message).join(". ")
-      setError(issues)
+      setError(parsed.error.issues.map((issue: { message: string }) => issue.message).join(". "))
       return
     }
 
     setLoading(true)
     try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "same-origin",
-        body: JSON.stringify({ email, password }),
+      const result = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
       })
       
-      const data = await res.json()
-      
-      if (!res.ok) {
-        throw new Error(data.error || "Login failed")
+      if (result?.error) {
+        setError(result.error)
+      } else if (result?.ok) {
+        router.push("/home")
       }
-
-      // Login successful - redirect to dashboard
-      router.push("/dashboard")
       
     } catch (err: any) {
       setError(err.message || "Login failed")

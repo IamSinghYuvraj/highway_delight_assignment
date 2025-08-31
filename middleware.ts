@@ -1,54 +1,56 @@
-import { NextResponse, type NextRequest } from "next/server"
-import { getToken } from "next-auth/jwt"
+import { withAuth } from "next-auth/middleware";
+import { NextResponse } from "next/server";
 
-const PUBLIC_PATHS = new Set(["/", "/login", "/signup"]) 
+export default withAuth(
+  function middleware(req) {
+    const { pathname } = req.nextUrl;
+    const token = req.nextauth?.token;
 
-function isStatic(pathname: string) {
-  if (pathname.startsWith("/_next") || pathname.startsWith("/static") || pathname.startsWith("/public")) return true
-  if (pathname.match(/\.(png|jpg|jpeg|svg|css|js|map|ico)$/)) return true
-  return false
-}
-
-export async function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl
-
-  if (isStatic(pathname)) return NextResponse.next()
-
-  // Allow NextAuth routes and register API
-  if (pathname.startsWith("/api/auth")) return NextResponse.next()
-  if (pathname === "/api/register") return NextResponse.next()
-
-  // If already authenticated, prevent visiting login/signup
-  if (PUBLIC_PATHS.has(pathname)) {
-    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET })
-    if (token && (pathname === "/login" || pathname === "/signup")) {
-      return NextResponse.redirect(new URL("/dashboard", req.url))
+    // If user is authenticated and tries to access auth pages, redirect to home
+    const isAuthPage = pathname === "/login" || pathname === "/signup";
+    if (token && isAuthPage) {
+      return NextResponse.redirect(new URL("/home", req.url));
     }
-    return NextResponse.next()
-  }
 
-  // Protect private pages under /dashboard and /private
-  const isProtected = pathname.startsWith("/dashboard") || pathname.startsWith("/private")
-  if (isProtected) {
-    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET })
-    if (!token) {
-      const url = req.nextUrl.clone()
-      url.pathname = "/login"
-      url.searchParams.set("redirectTo", pathname)
-      return NextResponse.redirect(url)
+    // Handle post-authentication redirect
+    if (pathname === '/api/auth/signin' && token) {
+      return NextResponse.redirect(new URL("/home", req.url));
     }
-  }
 
-  return NextResponse.next()
-}
+    return NextResponse.next();
+  },
+  {
+    callbacks: {
+      authorized: ({ token, req }) => {
+        const { pathname } = req.nextUrl;
+
+        // Allow auth-related and public routes (no session required)
+        if (
+          pathname.startsWith("/api/auth") || // NextAuth routes
+          pathname === "/" || // Landing page
+          pathname === "/login" ||
+          pathname === "/signup"
+        ) {
+          return true;
+        }
+
+        // All other routes require authentication
+        return !!token;
+      },
+    },
+  }
+);
 
 export const config = {
   matcher: [
-    "/api/:path*",
-    "/dashboard/:path*",
-    "/private/:path*",
-    "/login",
-    "/signup",
-    "/((?!_next/static|_next/image|favicon.ico).*)",
+    /*
+     * Match all request paths except:
+     * - api (all API routes)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public folder
+     */
+    "/((?!api|_next/static|_next/image|favicon.ico|public/).*)",
   ],
-}
+};

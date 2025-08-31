@@ -3,6 +3,7 @@ import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
 import { Analytics } from '@vercel/analytics/next'
 import ClientAnalytics from "@/components/ClientAnalytics"
+import { SessionProvider } from "@/components/SessionProvider"
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -19,7 +20,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
-        {children}
+        <SessionProvider>
+          {children}
+        </SessionProvider>
         {/* Move Analytics to client component to avoid hydration errors */}
         {typeof window !== "undefined" && <ClientAnalytics />}
       </body>

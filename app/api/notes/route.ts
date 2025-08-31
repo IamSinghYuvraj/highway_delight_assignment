@@ -1,58 +1,52 @@
-// app/api/notes/route.ts
-import { NextResponse } from "next/server"
-import { connectToDatabase } from "@/lib/db"
-import { Note } from "@/models/note"
-import { getUserFromRequest } from "@/lib/auth"
-import { noteCreateSchema } from "@/lib/validators"
+import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
+import { connectToDatabase } from "@/lib/db";
+import Note from "@/models/Note";
 
 export async function GET() {
   try {
-    const user = await getUserFromRequest()
-    if (!user) {
-      console.log("❌ Unauthorized access to notes")
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    console.log(`📝 Fetching notes for user: ${user.email}`)
+    await connectToDatabase();
+    const notes = await Note.find({ userId: session.user.id }).sort({ createdAt: -1 });
 
-    await connectToDatabase()
-    const notes = await Note.find({ userId: user.sub }).sort({ createdAt: -1 }).lean()
-    
-    console.log(`✅ Found ${notes.length} notes for user: ${user.email}`)
-    return NextResponse.json({ notes })
+    return NextResponse.json({ notes });
   } catch (error) {
-    console.error("Error fetching notes:", error)
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
+    console.error("Failed to fetch notes:", error);
+    return NextResponse.json({ error: "Failed to fetch notes" }, { status: 500 });
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const user = await getUserFromRequest()
-    if (!user) {
-      console.log("❌ Unauthorized access to create notes")
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await req.json()
-    const parsed = noteCreateSchema.safeParse(body)
-    if (!parsed.success) {
-      return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
+    const { title, content } = await request.json();
+
+    if (!title || !content) {
+      return NextResponse.json(
+        { error: "Title and content are required" },
+        { status: 400 }
+      );
     }
 
-    console.log(`📝 Creating note for user: ${user.email}`)
-
-    await connectToDatabase()
+    await connectToDatabase();
     const note = await Note.create({
-      title: parsed.data.title,
-      content: parsed.data.content,
-      userId: user.sub,
-    })
-    
-    console.log(`✅ Note created for user: ${user.email}`)
-    return NextResponse.json({ note })
+      title,
+      content,
+      userId: session.user.id,
+    });
+
+    return NextResponse.json({ note }, { status: 201 });
   } catch (error) {
-    console.error("Error creating note:", error)
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
+    console.error("Failed to create note:", error);
+    return NextResponse.json({ error: "Failed to create note" }, { status: 500 });
   }
 }
